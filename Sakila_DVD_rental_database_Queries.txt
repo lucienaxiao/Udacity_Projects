@@ -1,0 +1,63 @@
+/* Query 1 - query used for first insight */
+
+SELECT DATE_PART('month', r.rental_date), s.store_id, COUNT(*) 
+FROM rental r
+JOIN payment p ON r.rental_id = p.rental_id
+JOIN staff s ON s.staff_id = p.staff_id
+WHERE DATE_PART('year', r.rental_date) = 2005
+GROUP BY 1, 2
+ORDER BY 1, 2;
+
+/* Query 2 - query used for second insight */
+
+SELECT c.name category_name, SUM(t1.ct) total_rental_count
+FROM (SELECT f.film_id, COUNT(r.rental_id) ct
+      FROM film f
+      JOIN inventory i ON f.film_id = i.film_id
+	   JOIN rental r ON r.inventory_id = i.inventory_id
+      GROUP BY 1) t1
+JOIN film f ON t1.film_id = f.film_id
+JOIN film_category fc ON fc.film_id = f.film_id
+JOIN category c ON c.category_id = fc.category_id
+WHERE c.name IN ('Animation', 'Children', 'Classics', 'Comedy', 'Family', 'Music')
+GROUP BY 1
+ORDER BY 2, 1;
+
+/* Query 3 - query used for third insight */
+
+SELECT t1.customer_name,  
+       DATE_TRUNC('month', p.payment_date) pay_month, 
+       SUM(p.amount) monthly_total
+FROM 
+	(SELECT CONCAT(c.first_name, ' ', c.last_name) customer_name, 									 c.customer_id, 
+						 SUM(p.amount) total_payment
+	FROM customer c
+	JOIN payment p ON p.customer_id = c.customer_id
+	GROUP BY 2
+	ORDER BY 3 DESC
+	LIMIT 10) t1
+JOIN payment p ON p.customer_id = t1.customer_id
+WHERE DATE_PART('year', p.payment_date) = 2007
+GROUP BY 1, 2;
+
+/* Query 4 - query used for fourth insight */
+WITH t2 AS (SELECT t1.customer_name,  
+            DATE_TRUNC('month', p.payment_date) pay_month, 
+            SUM(p.amount) monthly_total
+				 FROM 
+						(SELECT CONCAT(c.first_name, ' ', c.last_name) customer_name,
+						        c.customer_id, 
+			  						SUM(p.amount) total_payment
+						 FROM customer c
+						 JOIN payment p ON p.customer_id = c.customer_id
+						 GROUP BY 2
+						 ORDER BY 3 DESC
+						 LIMIT 10) t1
+				JOIN payment p ON p.customer_id = t1.customer_id
+				WHERE DATE_PART('year', p.payment_date) = 2007
+				GROUP BY 1, 2
+				ORDER BY 1, 2)
+SELECT customer_name, pay_month, monthly_total, 
+	    monthly_total - LAG(monthly_total) OVER(PARTITION BY customer_name ORDER BY monthly_total) monthly_increment
+FROM t2;                               
+
